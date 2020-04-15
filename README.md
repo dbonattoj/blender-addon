@@ -11,6 +11,10 @@ I tried to do my best to port the addon to Blender 2.8 in a **very short** amoun
 I'm far from an expert in Blender, and even less in Blender scripting.
 If someone find bugs, feel free to fill issues and send patches :)
 
+## DEPTH MAPS
+
+I don't use the depth maps at the moment, so I don't have checked their correctness.
+
 # Installation
 
 Please clone the git repository into the blender/VERSION/scripts/addons/ folder of your local blender installation.
