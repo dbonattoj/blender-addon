@@ -215,8 +215,7 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
         bpy.context.object.data.cycles.aperture_fstop = LF.fstop
         bpy.context.object.data.cycles.aperture_blades = LF.num_blades
         bpy.context.object.data.cycles.aperture_rotation = LF.rotation
-        # TODO not sure gpu dof exist anymore
-        # bpy.context.object.data.gpu_dof.fstop = LF.fstop
+        bpy.context.object.data.dof.aperture_fstop = LF.fstop
 
         return camera
 
@@ -378,6 +377,10 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         bpy.data.scenes[scene_key].view_layers['View Layer'].use_pass_z = True
         #bpy.data.scenes[scene_key].view_layers['Render Layers'].use_pass_z = True
         #bpy.data.scenes[scene_key].render.layers['RenderLayer'].use_pass_z = True # RenderLayer renamed to View Layer in 2.8 ?? seems so.
+        # TODO need to try instead:
+        #for view in bpy.data.scenes[scene_key].view_layers:
+        #    if(view.use):
+        #        view.use_pass_z = True
 
         # remove all nodes of previous file outputs
         try:
@@ -395,7 +398,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
         # store current render status
         current_render_engine = bpy.context.scene.render.engine
-        #current_antialiasing = bpy.context.scene.render.use_antialiasing
+        current_antialiasing = bpy.context.scene.display.render_aa
 
         # change settings for high resolution rendering
         bpy.data.scenes[bpy.context.scene.name].render.resolution_percentage = 100 * LF.depth_map_scale
@@ -405,8 +408,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
             bpy.context.scene.render.engine = 'BLENDER_EEVEE'
         else:
             bpy.context.scene.render.engine = 'CYCLES'
-        #bpy.context.scene.render.use_antialiasing = False
-        # TODO NO MORE ANTI ALIASING WITH EVEE??
+        bpy.context.scene.display.render_aa = 'OFF'
 
         # render high resolution object id maps
         if LF.save_object_id_maps_for_all_views:
@@ -430,7 +432,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
         # reset status
         bpy.context.scene.render.engine = current_render_engine
-        # bpy.context.scene.render.use_antialiasing = current_antialiasing
+        bpy.context.scene.display.render_aa = current_antialiasing
         bpy.data.scenes[bpy.context.scene.name].render.resolution_percentage = 100
         bpy.data.scenes[scene_key].render.filepath = tgt_root_dir
 
@@ -481,6 +483,10 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         
         bpy.data.scenes[bpy.context.scene.name].view_layers["View Layer"].use_pass_object_index = True
         #bpy.data.scenes[bpy.context.scene.name].render.layers["RenderLayer"].use_pass_object_index = True
+        # TODO need to try:
+        #for view in bpy.data.scenes[bpy.context.scene.name].view_layers:
+        #    if(view.use):
+        #        view.use_pass_object_index = True
 
         # prepare nodes for object id map
         oid_out_node = bpy.data.scenes[scene_key].node_tree.nodes.new(type='CompositorNodeOutputFile')
@@ -550,11 +556,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         max_res = max(LF.x_res, LF.y_res)
         factor = LF.baseline_x_m * LF.focal_length * LF.focus_dist * max_res
 
-        # prepare depth output node. blender changed their naming convection for render layers in 2.79... so Z became Depth and everthing else got complicated ;)
-        if 'Z' in bpy.data.scenes[scene_key].node_tree.nodes['Render Layers'].outputs:
-            right = bpy.data.scenes[scene_key].node_tree.nodes['Render Layers'].outputs['Z']
-        else:
-            right = bpy.data.scenes[scene_key].node_tree.nodes['Render Layers'].outputs['Depth']
+        right = bpy.data.scenes[scene_key].node_tree.nodes['Render Layers'].outputs['Depth']
             
         depth_view_node = bpy.data.scenes[scene_key].node_tree.nodes.new('CompositorNodeViewer')
         depth_view_node.use_alpha = False
@@ -562,13 +564,13 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         bpy.data.scenes[scene_key].node_tree.links.new(right, left)
 
         for camera in cameras:
+            # TODO bug, always render central one!
             print("Rendering depth map with camera: " + camera.name)
 
             # set scene camera to current light field camera
             bpy.data.scenes[scene_key].camera = camera
 
             #depth_path = f"objectids_highres_depth_{self.get_raw_camera_name(camera.name)}_frame{bpy.context.scene.frame_current:03d}"
-
             #bpy.data.scenes[scene_key].render.filepath = os.path.join(bpy.path.abspath(LF.tgt_dir), depth_path)
 
             # render scene and extract depth map to numpy array
