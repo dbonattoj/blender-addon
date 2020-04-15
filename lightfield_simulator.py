@@ -55,9 +55,9 @@ class OBJECT_OT_show_frustum(bpy.types.Operator):
     def execute(self, context):
         frustum_name = bpy.context.scene.LF.get_frustum_name()
         try:
-            bpy.data.objects[frustum_name].hide = False
+            bpy.data.objects[frustum_name].hide_set(False)
         except KeyError:
-            print("Could not find frustum '%s' to show." % frustum_name)
+            print(f"Could not find frustum '{frustum_name}' to show.")
         return {'FINISHED'}
 
 
@@ -70,9 +70,9 @@ class OBJECT_OT_hide_frustum(bpy.types.Operator):
     def execute(self, context):
         frustum_name = bpy.context.scene.LF.get_frustum_name()
         try:
-            bpy.data.objects[frustum_name].hide = True
+            bpy.data.objects[frustum_name].hide_set(True)
         except KeyError:
-            print("Could not find frustum '%s' to hide. Try adding a camera grid first." % frustum_name)
+            print(f"Could not find frustum '{frustum_name}' to hide. Try adding a camera grid first.")
         return {'FINISHED'}
 
 
@@ -130,24 +130,24 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
 
             # delete frustum, cameras and container
             for camera in LF.get_lightfield_cameras():
-                camera.select = True
+                camera.select_set(True)
 
-            LF.get_frustum().hide = False
+            LF.get_frustum().hide_set(False)
             LF.get_frustum().hide_select = False
-            LF.get_frustum().select = True
+            LF.get_frustum().select_set(True)
 
             bpy.ops.object.delete()
 
             # restore initial state
             for object in selected_objects:
-                object.select = True
+                object.select_set(True)
 
         except KeyError:
-
-            bpy.ops.object.empty_add(type='PLAIN_AXES', view_align=False, location=(0, 0, 0), rotation=(0, 0, 0))
+            # TODO check this, before in 2.7 for empty_add there was view_align=False, I changed it by align='WORLD'
+            bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), rotation=(0, 0, 0))
             lightfield = bpy.context.object
 
-            lightfield.empty_draw_size = 0.4
+            lightfield.empty_display_size = 0.4
             lightfield.name = LF.get_lightfield_name()
 
             lightfield.location = [LF.center_cam_x, LF.center_cam_y, LF.center_cam_z]
@@ -165,11 +165,11 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
         lightfield_objects = cameras + [frustum]
         for object in lightfield_objects:
             object.parent = lightfield
-            object.select = False
+            object.select_set(False)
 
         # set the active object to LF container
-        bpy.context.scene.objects.active = lightfield
-        lightfield.select = True
+        bpy.context.view_layer.objects.active = lightfield
+        lightfield.select_set(True)
 
         return {'FINISHED'}
 
@@ -196,17 +196,17 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
 
         camera = bpy.context.active_object
         camera.name = cam_name
-        camera.data.draw_size = 0.5
+        camera.data.display_size = 0.5
         camera.data.lens = LF.focal_length
         camera.data.sensor_width = LF.sensor_size
         camera.data.sensor_height = LF.sensor_size
 
         if LF.focus_dist == 0:
             factor = 0  # focused at infinity
-            bpy.context.object.data.dof_distance = 10000  # not really infinity... but close enough.
+            bpy.context.object.data.dof.focus_distance = 10000  # not really infinity... but close enough.
         else:
             factor = LF.focal_length / LF.sensor_size / LF.focus_dist
-            bpy.context.object.data.dof_distance = LF.focus_dist
+            bpy.context.object.data.dof.focus_distance = LF.focus_dist
 
         camera.data.shift_x = -x_pos * factor
         camera.data.shift_y = -y_pos * factor
@@ -215,7 +215,8 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
         bpy.context.object.data.cycles.aperture_fstop = LF.fstop
         bpy.context.object.data.cycles.aperture_blades = LF.num_blades
         bpy.context.object.data.cycles.aperture_rotation = LF.rotation
-        bpy.context.object.data.gpu_dof.fstop = LF.fstop
+        # TODO not sure gpu dof exist anymore
+        # bpy.context.object.data.gpu_dof.fstop = LF.fstop
 
         return camera
 
@@ -270,8 +271,8 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
 
         # add color
         face_material = bpy.data.materials.new("Cyan")
-        face_material.diffuse_color = (0, 1, 1)
-        face_material.alpha = 0.3
+        face_material.diffuse_color = (0, 1, 1, 0.3)
+        # face_material.alpha = 0.3
 
         frustum.data.materials.append(face_material)
         for face in frustum.data.polygons:
@@ -279,7 +280,7 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
 
         # add frustum to scene
         scene = bpy.context.scene
-        scene.objects.link(frustum)
+        scene.collection.objects.link(frustum)
 
         return frustum
 
@@ -312,20 +313,23 @@ class OBJECT_OT_delete_lightfield(bpy.types.Operator):
 
             # delete frustum, cameras and container
             for camera in LF.get_lightfield_cameras():
-                camera.select = True
+                camera.select_set(True)
 
-            LF.get_frustum().hide = False
+            LF.get_frustum().hide_set(False)
             LF.get_frustum().hide_select = False
-            LF.get_frustum().select = True
-            lightfield.select = True
+            LF.get_frustum().select_set(True)
+            lightfield.select_set(True)
             bpy.ops.object.delete()
 
             # restore initial state
-            for object in selected_objects:
-                object.select = True
+            try:
+                for object in selected_objects:
+                    object.select_set(True)
+            except:
+                print("No objects were previously selected.")
 
         except KeyError:
-            print ("No camera grid to delete with name: %s. Try adding a camera grid first." % LF.get_lightfield_name())
+            print (f"No camera grid to delete with name: {LF.get_lightfield_name()}. Try adding a camera grid first.")
 
         return {'FINISHED'}
 
@@ -371,7 +375,9 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
 
         bpy.context.scene.use_nodes = True
-        bpy.data.scenes[scene_key].render.layers['RenderLayer'].use_pass_z = True
+        bpy.data.scenes[scene_key].view_layers['View Layer'].use_pass_z = True
+        #bpy.data.scenes[scene_key].view_layers['Render Layers'].use_pass_z = True
+        #bpy.data.scenes[scene_key].render.layers['RenderLayer'].use_pass_z = True # RenderLayer renamed to View Layer in 2.8 ?? seems so.
 
         # remove all nodes of previous file outputs
         try:
@@ -389,12 +395,18 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
         # store current render status
         current_render_engine = bpy.context.scene.render.engine
-        current_antialiasing = bpy.context.scene.render.use_antialiasing
+        #current_antialiasing = bpy.context.scene.render.use_antialiasing
 
         # change settings for high resolution rendering
         bpy.data.scenes[bpy.context.scene.name].render.resolution_percentage = 100 * LF.depth_map_scale
-        bpy.context.scene.render.engine = 'BLENDER_RENDER'
-        bpy.context.scene.render.use_antialiasing = False
+        #bpy.context.scene.render.engine = 'BLENDER_WORKBENCH' # OLD: 'BLENDER_RENDER'
+        # Cycles with 2.8
+        if LF.save_fast_rendering:
+            bpy.context.scene.render.engine = 'BLENDER_EEVEE'
+        else:
+            bpy.context.scene.render.engine = 'CYCLES'
+        #bpy.context.scene.render.use_antialiasing = False
+        # TODO NO MORE ANTI ALIASING WITH EVEE??
 
         # render high resolution object id maps
         if LF.save_object_id_maps_for_all_views:
@@ -418,7 +430,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
         # reset status
         bpy.context.scene.render.engine = current_render_engine
-        bpy.context.scene.render.use_antialiasing = current_antialiasing
+        # bpy.context.scene.render.use_antialiasing = current_antialiasing
         bpy.data.scenes[bpy.context.scene.name].render.resolution_percentage = 100
         bpy.data.scenes[scene_key].render.filepath = tgt_root_dir
 
@@ -456,7 +468,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
             # change seed
             bpy.data.scenes[scene_key].cycles.seed = LF.cycles_seed + cam_idx
-            print("Cycles seed for camera %d: %d" % (cam_idx, bpy.data.scenes[scene_key].cycles.seed))
+            print(f"Cycles seed for camera {cam_idx}: {bpy.data.scenes[scene_key].cycles.seed}")
 
             # render scene and adjust the file name
             bpy.ops.render.render(write_still=True)
@@ -466,7 +478,9 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         bpy.context.scene.node_tree.nodes.remove(image_out_node)
 
     def render_object_id_maps(self, cameras, scene_key, LF, tgt_dir):
-        bpy.data.scenes[bpy.context.scene.name].render.layers["RenderLayer"].use_pass_object_index = True
+        
+        bpy.data.scenes[bpy.context.scene.name].view_layers["View Layer"].use_pass_object_index = True
+        #bpy.data.scenes[bpy.context.scene.name].render.layers["RenderLayer"].use_pass_object_index = True
 
         # prepare nodes for object id map
         oid_out_node = bpy.data.scenes[scene_key].node_tree.nodes.new(type='CompositorNodeOutputFile')
@@ -501,7 +515,9 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         for camera in cameras:
             print("Rendering object id map with camera: " + camera.name)
             oid_filename = 'objectids_highres_' + self.get_raw_camera_name(camera.name)
-            out_oid.path = oid_filename + "_frame###"
+            
+            out_oid.path = f"{oid_filename}_frame{bpy.context.scene.frame_current:03d}"
+            bpy.data.scenes[scene_key].render.filepath = os.path.join(bpy.path.abspath(LF.tgt_dir), out_oid.path)
 
             # set scene camera to current light field camera
             bpy.data.scenes[scene_key].camera = camera
@@ -512,7 +528,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
         # handle additional "standard" center view object id map
         center_camera = LF.get_center_camera()
-        src = os.path.join(tgt_dir, 'objectids_highres_%s.png' % self.get_raw_camera_name(center_camera.name))
+        src = os.path.join(tgt_dir, f'objectids_highres_{self.get_raw_camera_name(center_camera.name)}.png')
         tgt = os.path.join(tgt_dir, 'objectids_highres.png')
 
         # remove file with final filename if it exists
@@ -551,6 +567,10 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
             # set scene camera to current light field camera
             bpy.data.scenes[scene_key].camera = camera
 
+            #depth_path = f"objectids_highres_depth_{self.get_raw_camera_name(camera.name)}_frame{bpy.context.scene.frame_current:03d}"
+
+            #bpy.data.scenes[scene_key].render.filepath = os.path.join(bpy.path.abspath(LF.tgt_dir), depth_path)
+
             # render scene and extract depth map to numpy array
             bpy.ops.render.render(write_still=True)
             pixels = bpy.data.images['Viewer Node'].pixels  # size is width * height * 4 (rgba)
@@ -588,13 +608,13 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
             if LF.save_depth_for_all_views:
                 camera_name = self.get_raw_camera_name(camera.name)
-                write_pfm(depth, os.path.join(tgt_dir, 'gt_depth_highres_%s.pfm' % camera_name))
-                write_pfm(disp, os.path.join(tgt_dir, 'gt_disp_highres_%s.pfm' % camera_name))
-                write_pfm(depth_small, os.path.join(tgt_dir, 'gt_depth_lowres_%s.pfm' % camera_name))
-                write_pfm(disp_small, os.path.join(tgt_dir, 'gt_disp_lowres_%s.pfm' % camera_name))
+                write_pfm(depth, os.path.join(tgt_dir, f'gt_depth_highres_{camera_name}.pfm'))
+                write_pfm(disp, os.path.join(tgt_dir,  f'gt_disp_highres_{camera_name}.pfm'))
+                write_pfm(depth_small, os.path.join(tgt_dir, f'gt_depth_lowres_{camera_name}.pfm'))
+                write_pfm(disp_small, os.path.join(tgt_dir,  f'gt_disp_lowres_{camera_name}.pfm'))
 
     def fix_pixel_artefacts(self, disp, m_out_of_range, half_window=1):
-        print("Fixing %d out of range pixel(s), values: %s" % (np.sum(m_out_of_range), list(disp[m_out_of_range])))
+        print(f"Fixing {np.sum(m_out_of_range):d} out of range pixel(s), values: {list(disp[m_out_of_range])}")
         coords = np.where(m_out_of_range)
         h, w = np.shape(disp)
 
@@ -609,7 +629,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
             n_values = np.size(valid_window_values)
 
             if n_values == 0:
-                print("Could not find any pixels for inpainting depth artifact at (%d, %d)." % (y, x))
+                print(f"Could not find any pixels for inpainting depth artifact at ({x:d}, {y:d}).")
                 continue
 
             # compute median (without averaging for even n)
@@ -625,10 +645,10 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
     @staticmethod
     def remove_blender_frame_from_file_name(image_filename, tgt_dir):
-        blender_filename = os.path.join(tgt_dir, "%s_frame%03d.png" % (image_filename, bpy.context.scene.frame_current))
+        blender_filename = os.path.join(tgt_dir, f"{image_filename}_frame{bpy.context.scene.frame_current:03d}.png")
 
         # remove blender frame numbers from file name
-        final_filename = os.path.join(tgt_dir, os.path.join(tgt_dir, "%s.png" % image_filename))
+        final_filename = os.path.join(tgt_dir, os.path.join(tgt_dir, f"{image_filename}.png"))
 
         # remove file with final filename if it exists
         # (necessary for Windows systems where renaming is not an atomic operation)
@@ -644,12 +664,28 @@ def write_pfm(data, fpath):
         # header
         height, width = np.shape(data)
         file.write('Pf\n'.encode('utf-8'))
-        file.write(('%d %d\n' % (width, height)).encode('utf-8'))
-        file.write(('%d\n' % -1).encode('utf-8'))
+        file.write((f'{width:d} {height:d}\n').encode('utf-8'))
+        file.write((f'{-1:d}\n').encode('utf-8'))
 
         # data
         values = np.ndarray.flatten(np.asarray(data, dtype=np.float32))
         file.write(values)
+    # TODO write_png(data, fpath[:-4] + ".png")
+
+def write_png(data, fpath):
+    height, width = np.shape(data)
+
+    out = data/data.max()
+    out = out * 255
+
+    image = bpy.data.images.new("depth", alpha = False, width=width, height=height)
+    image.pixels = out
+    image.filepath_raw = fpath
+    image.file_format = 'PNG'
+    image.save()
+
+    
+    #np.imwrite(fpath, out.astype('uint8'))
 
 
 def median_downsampling(img, tile_height, tile_width):

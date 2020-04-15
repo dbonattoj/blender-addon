@@ -101,8 +101,17 @@ def update_path_config_file(self, context):
         LF.path_config_file = get_default_path_config_file()
 
 
+def get_user_temporary_directory(context):
+    if hasattr(context, "user_preferences"):
+        return context.user_preferences.filepaths.temporary_directory
+    
+    return context.preferences.filepaths.temporary_directory
+
+
 def get_default_target_directory():
-    path = os.path.join(bpy.context.user_preferences.filepaths.temporary_directory, 'lightfield')
+    #from datetime import datetime
+    temporary_directory = get_user_temporary_directory(bpy.context)
+    path = os.path.join(temporary_directory, 'lightfield')
     if not os.path.isdir(path):
         os.makedirs(path)
     return path

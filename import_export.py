@@ -41,7 +41,7 @@ class OBJECT_OT_save_lightfield(bpy.types.Operator):
     """Save config file with camera setup"""
     bl_idname = "scene.save_lightfield"
     bl_label = """Save light field parameters"""
-    bl_options = {'REGISTER'}
+    #bl_options = {'REGISTER'}
 
     def execute(self, context):
         LF = bpy.context.scene.LF
