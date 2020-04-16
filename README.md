@@ -8,12 +8,24 @@ The original authors [blender-addon](https://github.com/lightfield-analysis/blen
 However, recently, Blender 2.8 came out and became the new standard for 3D rendering with its fast rendering engine Eevee.
 
 I tried to do my best to port the addon to Blender 2.8 in a **very short** amount of time.
+
 I'm far from an expert in Blender, and even less in Blender scripting.
+
 If someone find bugs, feel free to fill issues and send patches :)
 
-## DEPTH MAPS
+I navigated through several forks of the main repository and integrated here some features that I found interesting.
 
-I don't use the depth maps at the moment, so I don't have checked their correctness.
+
+## Eevee vs Cycles for Depth Maps
+
+If you write your own renderer, it will appear normally in the list :)
+
+Cycles seems to have a **bug** rendering depth maps:
+
+- Eevee: depth is the distance with the camera axis.
+- Cycles: depth is the distance between the camera and the object.
+
+To render "accurate" depthmaps, use Eevee.
 
 # Installation
 
