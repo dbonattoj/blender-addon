@@ -577,6 +577,13 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
         depth_out_node.base_path = tgt_dir
 
+
+        # Viewer for disparity
+        depth_view_node = bpy.data.scenes[scene_key].node_tree.nodes.new('CompositorNodeViewer')
+        depth_view_node.use_alpha = False
+        left = depth_view_node.inputs[0]
+        bpy.data.scenes[scene_key].node_tree.links.new(right, left)
+
         for camera in cameras:
             c_image = 'Image'
             print("Rendering scene with camera: " + camera.name)
@@ -591,10 +598,50 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
             bpy.ops.render.render(write_still=True)
             depth_out_node.file_slots[c_image].path = 'Image' # Set back scene path name
             # TODO self.remove_blender_frame_from_file_name(image_filename, tgt_dir)  ### keep the frame number
+
+            #depth = bpy.data.images.load(c_image)
+
+            pixels = bpy.data.images['Viewer Node'].pixels  # size is width * height * 4 (rgba)
+            self.save_disparity(pixels, LF, camera, tgt_dir)
         
         # remove the image output node
         bpy.context.scene.node_tree.nodes.remove(depth_out_node)
         print('Depth rendering done.')
+
+    def save_disparity(self, pixels, LF, camera, tgt_dir):
+        max_res = max(LF.x_res, LF.y_res)
+        factor = LF.baseline_x_m * LF.focal_length * LF.focus_dist * max_res
+        depth = np.array(pixels)[::4]
+
+        # reshape high resolution depth map
+        depth = depth.reshape((int(LF.y_res * LF.depth_map_scale), int(LF.x_res * LF.depth_map_scale)))
+
+        # create depth map with original (low) resolution
+        depth_small = median_downsampling(depth, LF.depth_map_scale, LF.depth_map_scale)
+
+        # check if high resolution depth map has depth artifacts on individual pixels
+        min_depth = np.min(depth_small)
+        max_depth = np.max(depth_small)
+        m_out_of_range = (depth < 0.9*min_depth) + (depth > 1.1*max_depth)
+
+        if np.sum(m_out_of_range) > 0:
+            depth = self.fix_pixel_artefacts(depth, m_out_of_range)
+            depth_small = median_downsampling(depth, LF.depth_map_scale, LF.depth_map_scale)
+
+        # create disparity maps
+        disp = (factor / depth - LF.baseline_x_m * LF.focal_length * max_res) / LF.focus_dist / LF.sensor_size
+        disp_small = median_downsampling(disp, LF.depth_map_scale, LF.depth_map_scale)
+
+        # set disparity range for config file
+        LF.min_disp = np.floor(np.amin(disp_small) * 10) / 10 - 0.1
+        LF.max_disp = np.ceil(np.amax(disp_small) * 10) / 10 + 0.1
+
+        # save disparity files
+        camera_name = self.get_raw_camera_name(camera.name)
+        write_pfm(depth, os.path.join(tgt_dir, f'gt_depth_highres_{camera_name}.pfm'))
+        write_pfm(disp, os.path.join(tgt_dir,  f'gt_disp_highres_{camera_name}.pfm'))
+        write_pfm(depth_small, os.path.join(tgt_dir, f'gt_depth_lowres_{camera_name}.pfm'))
+        write_pfm(disp_small, os.path.join(tgt_dir,  f'gt_disp_lowres_{camera_name}.pfm'))
 
     def render_depth_and_disp_maps(self, cameras, scene_key, LF, tgt_dir):
         max_res = max(LF.x_res, LF.y_res)
