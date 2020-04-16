@@ -48,6 +48,15 @@ import os
 
 from . import updates
 
+def get_renderers():
+    renderers = [
+        ("BLENDER_EEVEE", "Eevee", "Eevee Renderer (depth)"),
+        ("BLENDER_WORKBENCH", "Viewport", "Viewport renderer (depth)")
+    ]
+    for renderer in bpy.types.RenderEngine.__subclasses__():
+        renderers.append((renderer.bl_idname, renderer.bl_label, f"{renderer.bl_label} (depth)"))
+    
+    return renderers
 
 # global properties for the script, mainly for UI
 class LFPropertyGroup(bpy.types.PropertyGroup):
@@ -132,11 +141,18 @@ class LFPropertyGroup(bpy.types.PropertyGroup):
         default=10.0,
         description='Factor for the high resolution depth map export'
     )
-    save_fast_rendering : BoolProperty(
-        name='Fast rendering',
-        default=True,
-        description='save with EEVEE rendering engine if activated, otherwise Cycles'
+
+    save_fast_rendering : EnumProperty(
+        name='Depth Rendering',
+        items=get_renderers(),
+        #get=get_renderers,
+        #set=set_renderers
     )
+    #save_fast_rendering : BoolProperty(
+    #    name='Fast rendering',
+    #    default=True,
+    #    description='save with EEVEE rendering engine if activated, otherwise Cycles'
+    #)
     save_depth_for_all_views : BoolProperty(
         name='save depth and disparity maps for all views',
         default=False,
