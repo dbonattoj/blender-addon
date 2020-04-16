@@ -4,7 +4,7 @@ import os
 def convert(filename):
   filename_wo_ext = filename.split(".")[0]
 
-  image = imageio.imread('gt_depth_highres.pfm')
+  image = imageio.imread(filename)
   
   print(f"Converting {filename} of shape {image.shape}.")
   
@@ -18,6 +18,3 @@ if __name__ == "__main__":
   for file in os.listdir("."):
     if file.endswith(".pfm"):
       convert(file)
-
-
-  
