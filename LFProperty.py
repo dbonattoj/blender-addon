@@ -142,11 +142,23 @@ class LFPropertyGroup(bpy.types.PropertyGroup):
         description='Factor for the high resolution depth map export'
     )
 
+    # Source: https://github.com/Chuudy/lightfield-renderer-blender-addon/
+    color_map_format : EnumProperty(
+        items=[('PNG', 'PNG', 'PNG'), ('JPEG','JPEG','JPEG'), ('HDR', 'Radiance HDR', 'Radian HDR') , ('OPEN_EXR', 'OpenEXR', 'OpenEXR')],
+        name='color format',
+        default=None,
+        options={'ANIMATABLE'}
+    )
+    depth_map_format : EnumProperty(
+        items=[('HDR', 'Radiance HDR', 'Radian HDR') , ('OPEN_EXR', 'OpenEXR', 'OpenEXR')],
+        name='depth format',
+        default=None,
+        options={'ANIMATABLE'}
+    )
+
     save_fast_rendering : EnumProperty(
         name='Depth Rendering',
-        items=get_renderers(),
-        #get=get_renderers,
-        #set=set_renderers
+        items=get_renderers()
     )
     #save_fast_rendering : BoolProperty(
     #    name='Fast rendering',
