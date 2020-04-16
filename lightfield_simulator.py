@@ -402,12 +402,8 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
         # change settings for high resolution rendering
         bpy.data.scenes[bpy.context.scene.name].render.resolution_percentage = 100 * LF.depth_map_scale
-        #bpy.context.scene.render.engine = 'BLENDER_WORKBENCH' # OLD: 'BLENDER_RENDER'
-        # Cycles with 2.8
-        if LF.save_fast_rendering:
-            bpy.context.scene.render.engine = 'BLENDER_EEVEE'
-        else:
-            bpy.context.scene.render.engine = 'CYCLES'
+        bpy.context.scene.render.engine = LF.save_fast_rendering
+        print(f"RENDERER: {bpy.context.scene.render.engine}")
         bpy.context.scene.display.render_aa = 'OFF'
 
         # render high resolution object id maps
