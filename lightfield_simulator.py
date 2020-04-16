@@ -143,7 +143,6 @@ class OBJECT_OT_create_lightfield(bpy.types.Operator):
                 object.select_set(True)
 
         except KeyError:
-            # TODO check this, before in 2.7 for empty_add there was view_align=False, I changed it by align='WORLD'
             bpy.ops.object.empty_add(type='PLAIN_AXES', align='WORLD', location=(0, 0, 0), rotation=(0, 0, 0))
             lightfield = bpy.context.object
 
@@ -416,14 +415,13 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         else:
             oid_cameras = [LF.get_center_camera()]
         # TODO what are the id maps??
-        #TODO self.render_object_id_maps(oid_cameras, scene_key, LF, tgt_dir)
+        #self.render_object_id_maps(oid_cameras, scene_key, LF, tgt_dir)
 
         # render high resolution depth maps
         if LF.save_depth_for_all_views:
             depth_cameras = lf_cameras
         else:
             depth_cameras = [LF.get_center_camera()]
-        #self.render_depth_and_disp_maps(depth_cameras, scene_key, LF, tgt_dir)
         self.render_depth_maps(depth_cameras, scene_key, LF, tgt_dir)
 
         # save parameters as config file in target directory of rendering
@@ -479,7 +477,7 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
 
             # render scene and adjust the file name
             bpy.ops.render.render(write_still=True)
-            # TODO self.remove_blender_frame_from_file_name(image_filename, tgt_dir)
+            # self.remove_blender_frame_from_file_name(image_filename, tgt_dir) # Keep Frame
 
         # remove the image output node
         bpy.context.scene.node_tree.nodes.remove(image_out_node)
@@ -597,15 +595,14 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
             # render scene and adjust the file name
             bpy.ops.render.render(write_still=True)
             depth_out_node.file_slots[c_image].path = 'Image' # Set back scene path name
-            # TODO self.remove_blender_frame_from_file_name(image_filename, tgt_dir)  ### keep the frame number
-
-            #depth = bpy.data.images.load(c_image)
+            # self.remove_blender_frame_from_file_name(image_filename, tgt_dir)  ### keep the frame number
 
             pixels = bpy.data.images['Viewer Node'].pixels  # size is width * height * 4 (rgba)
             self.save_disparity(pixels, LF, camera, tgt_dir)
         
         # remove the image output node
         bpy.context.scene.node_tree.nodes.remove(depth_out_node)
+        bpy.context.scene.node_tree.nodes.remove(depth_view_node)
         print('Depth rendering done.')
 
     def save_disparity(self, pixels, LF, camera, tgt_dir):
@@ -642,69 +639,6 @@ class OBJECT_OT_render_lightfield(bpy.types.Operator):
         write_pfm(disp, os.path.join(tgt_dir,  f'gt_disp_highres_{camera_name}.pfm'))
         write_pfm(depth_small, os.path.join(tgt_dir, f'gt_depth_lowres_{camera_name}.pfm'))
         write_pfm(disp_small, os.path.join(tgt_dir,  f'gt_disp_lowres_{camera_name}.pfm'))
-
-    def render_depth_and_disp_maps(self, cameras, scene_key, LF, tgt_dir):
-        max_res = max(LF.x_res, LF.y_res)
-        factor = LF.baseline_x_m * LF.focal_length * LF.focus_dist * max_res
-
-        right = bpy.data.scenes[scene_key].node_tree.nodes['Render Layers'].outputs['Depth']
-            
-        depth_view_node = bpy.data.scenes[scene_key].node_tree.nodes.new('CompositorNodeViewer')
-        depth_view_node.use_alpha = False
-        left = depth_view_node.inputs[0]
-        bpy.data.scenes[scene_key].node_tree.links.new(right, left)
-
-        for camera in cameras:
-            # TODO bug, always render central one!
-            print("Rendering depth map with camera: " + camera.name)
-
-            # set scene camera to current light field camera
-            bpy.data.scenes[scene_key].camera = camera
-
-            #depth_path = f"objectids_highres_depth_{self.get_raw_camera_name(camera.name)}_frame{bpy.context.scene.frame_current:03d}"
-            #bpy.data.scenes[scene_key].render.filepath = os.path.join(bpy.path.abspath(LF.tgt_dir), depth_path)
-
-            # render scene and extract depth map to numpy array
-            bpy.ops.render.render(write_still=True)
-            pixels = bpy.data.images['Viewer Node'].pixels  # size is width * height * 4 (rgba)
-            depth = np.array(pixels)[::4]
-
-            # reshape high resolution depth map
-            depth = depth.reshape((int(LF.y_res * LF.depth_map_scale), int(LF.x_res * LF.depth_map_scale)))
-
-            # create depth map with original (low) resolution
-            depth_small = median_downsampling(depth, LF.depth_map_scale, LF.depth_map_scale)
-
-            # check if high resolution depth map has depth artifacts on individual pixels
-            min_depth = np.min(depth_small)
-            max_depth = np.max(depth_small)
-            m_out_of_range = (depth < 0.9*min_depth) + (depth > 1.1*max_depth)
-
-            if np.sum(m_out_of_range) > 0:
-                depth = self.fix_pixel_artefacts(depth, m_out_of_range)
-                depth_small = median_downsampling(depth, LF.depth_map_scale, LF.depth_map_scale)
-
-            # create disparity maps
-            disp = (factor / depth - LF.baseline_x_m * LF.focal_length * max_res) / LF.focus_dist / LF.sensor_size
-            disp_small = median_downsampling(disp, LF.depth_map_scale, LF.depth_map_scale)
-
-            # set disparity range for config file
-            LF.min_disp = np.floor(np.amin(disp_small) * 10) / 10 - 0.1
-            LF.max_disp = np.ceil(np.amax(disp_small) * 10) / 10 + 0.1
-
-            # save disparity files
-            if camera.name == LF.get_center_camera().name:
-                write_pfm(depth, os.path.join(tgt_dir, 'gt_depth_highres.pfm'))
-                write_pfm(disp, os.path.join(tgt_dir, 'gt_disp_highres.pfm'))
-                write_pfm(depth_small, os.path.join(tgt_dir, 'gt_depth_lowres.pfm'))
-                write_pfm(disp_small, os.path.join(tgt_dir, 'gt_disp_lowres.pfm'))
-
-            if LF.save_depth_for_all_views:
-                camera_name = self.get_raw_camera_name(camera.name)
-                write_pfm(depth, os.path.join(tgt_dir, f'gt_depth_highres_{camera_name}.pfm'))
-                write_pfm(disp, os.path.join(tgt_dir,  f'gt_disp_highres_{camera_name}.pfm'))
-                write_pfm(depth_small, os.path.join(tgt_dir, f'gt_depth_lowres_{camera_name}.pfm'))
-                write_pfm(disp_small, os.path.join(tgt_dir,  f'gt_disp_lowres_{camera_name}.pfm'))
 
     def fix_pixel_artefacts(self, disp, m_out_of_range, half_window=1):
         print(f"Fixing {np.sum(m_out_of_range):d} out of range pixel(s), values: {list(disp[m_out_of_range])}")
@@ -763,23 +697,6 @@ def write_pfm(data, fpath):
         # data
         values = np.ndarray.flatten(np.asarray(data, dtype=np.float32))
         file.write(values)
-    # TODO write_png(data, fpath[:-4] + ".png")
-
-def write_png(data, fpath):
-    height, width = np.shape(data)
-
-    out = data/data.max()
-    out = out * 255
-
-    image = bpy.data.images.new("depth", alpha = False, width=width, height=height)
-    image.pixels = out
-    image.filepath_raw = fpath
-    image.file_format = 'PNG'
-    image.save()
-
-    
-    #np.imwrite(fpath, out.astype('uint8'))
-
 
 def median_downsampling(img, tile_height, tile_width):
     h, w = np.shape(img)

@@ -51,7 +51,7 @@ from . import updates
 def get_renderers():
     renderers = [
         ("BLENDER_EEVEE", "Eevee", "Eevee Renderer (depth)"),
-        ("BLENDER_WORKBENCH", "Viewport", "Viewport renderer (depth)")
+        #("BLENDER_WORKBENCH", "Viewport", "Viewport renderer (depth)") # TODO if we use the viewport renderer, the depth fails!
     ]
     for renderer in bpy.types.RenderEngine.__subclasses__():
         renderers.append((renderer.bl_idname, renderer.bl_label, f"{renderer.bl_label} (depth)"))
