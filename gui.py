@@ -86,8 +86,8 @@ class VIEW3D_PT_lightfield_setup(bpy.types.Panel):
         col.prop(LF, "sequence_end")
         col.prop(LF, "sequence_steps")
         col.prop(LF, "save_fast_rendering")
-        #col.prop(LF, "save_depth_for_all_views")
-        #col.prop(LF, "save_object_id_maps_for_all_views")
+        col.prop(LF, "save_depth_for_all_views")
+        col.prop(LF, "save_object_id_maps_for_all_views")
         col.operator("scene.render_lightfield", text="Render Light Field", icon="HAND")
 
         col = layout.column(align=True)
