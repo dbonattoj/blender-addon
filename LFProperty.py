@@ -138,7 +138,7 @@ class LFPropertyGroup(bpy.types.PropertyGroup):
     )
     depth_map_scale : FloatProperty(
         name='depthMapScale',
-        default=10.0,
+        default=1.0,
         description='Factor for the high resolution depth map export'
     )
 
